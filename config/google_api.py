@@ -1,0 +1,4 @@
+# -*- coding: utf-8 -*-
+
+CREDENTIALS_FILE = 'JSON_FILE'
+SHEETS_FILE = 'SHEETS_FILE_API'
