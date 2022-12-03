@@ -4,22 +4,15 @@ import calendar
 from datetime import datetime
 import httplib2
 import apiclient
-from google_api import *
+from config import CREDENTIALS_FILE, SHEETS_FILE, CELL_LIST, DAY_TIME, USER
 from oauth2client.service_account import ServiceAccountCredentials
-
-CELL_LIST = ['B', 'Z', 'AX', 'BV', 'CT', 'DR', 'EP',
-             'FN', 'GL', 'HJ', 'IH', 'JF', 'KD', 'LB', 'LZ',
-             'MX', 'NV', 'OT', 'PR', 'QP', 'RN', 'SL', 'TJ',
-             'UH', 'VF', 'WD', 'XB', 'XZ', 'YX', 'ZV', 'AAT']
 
 
 class SheetWork:
     """
 
     """
-    def __init__(self, spreadsheet_id=None,
-                 date=datetime.now(),
-                 function='update'):
+    def __init__(self, spreadsheet_id=None, date=datetime.now(), function='update'):
         self.spreadsheetId = spreadsheet_id
         self.function = function
         credentials = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE,
@@ -27,7 +20,9 @@ class SheetWork:
                                                                         'https://www.googleapis.com/auth/drive'])
         self.date = date
         self.httpAuth = credentials.authorize(httplib2.Http())  # api_auth
-        self.service = apiclient.discovery.build('sheets', 'v4', http=self.httpAuth)
+        self.service = apiclient.discovery.build('sheets',
+                                                 'v4',
+                                                 http=self.httpAuth)
 
     def week_day(self):
         cal = calendar.Calendar(firstweekday=0)
@@ -41,13 +36,15 @@ class SheetWork:
         return day_list
 
     def create(self):
-        spreadsheet = self.service.spreadsheets().create(body={
-            'properties': {'title': 'Еimetable OrcMaster', 'locale': 'ru_RU'},
-            'sheets': [{'properties': {'sheetType': 'GRID',
-                                       'sheetId': 0,
-                                       'title': self.date.strftime("%B"),
-                                       'gridProperties': {'rowCount': 100, 'columnCount': 15}}}]
-        }).execute()
+        spreadsheet = self.service.spreadsheets().create(
+            body={'properties': {'title': 'Еimetable OrcMaster',
+                                 'locale': 'ru_RU'},
+                  'sheets': [{'properties': {'sheetType': 'GRID',
+                                             'sheetId': 0,
+                                             'title': self.date.strftime("%B"),
+                                             'gridProperties': {'rowCount': 100,
+                                                                'columnCount': 15}}}]
+                  }).execute()
         return spreadsheet
 
     def add_sheets(self, name):
@@ -55,11 +52,10 @@ class SheetWork:
         result = self.service.spreadsheets().batchUpdate(
             spreadsheetId=self.spreadsheetId,
             body={"requests": [{"addSheet": {
-                "properties": {
-                    "title": name,
-                    "gridProperties": {
-                        "rowCount": 20,
-                        "columnCount": (len(self.week_day()) * 24) + 1}}}}
+                "properties": {"title": name,
+                               "gridProperties": {
+                                   "rowCount": 20,
+                                   "columnCount": (len(self.week_day()) * 24) + 1}}}}
             ]}).execute()
         spreadsheet = self.service.spreadsheets().get(spreadsheetId=self.spreadsheetId).execute()
         sheet_list = spreadsheet.get('sheets')
@@ -181,7 +177,7 @@ class SheetWork:
         return result
 
     def marge_calls(self, sheet_id):
-        print((len(self.week_day()) * 24) + 2)
+        print((len(self.week_day()) * 24) + 2, 'CALLS')
         result = [{'mergeCells': {'range': {'sheetId': sheet_id,
                                             'startRowIndex': 0,
                                             'endRowIndex': 2,
@@ -206,9 +202,9 @@ class SheetWork:
             end = end + 24
         return result
 
-    def rights(self, sheet_id, role='writer', email='aske366@gmail.com'):
-        driveService = apiclient.discovery.build('drive', 'v3', http=self.httpAuth)
-        access = driveService.permissions().create(
+    def rights(self, sheet_id, role='writer', email=USER):
+        DriveService = apiclient.discovery.build('drive', 'v3', http=self.httpAuth)
+        access = DriveService.permissions().create(
             fileId=sheet_id,
             body={'type': 'user', 'role': role, 'emailAddress': email},
             fields='id'
@@ -223,8 +219,8 @@ class SheetWork:
             result.append(self.balnce_day_night(
                 sheet_id,
                 day=day,
-                day_time=5,
-                night_time=22
+                day_time=DAY_TIME['end_night'],
+                night_time=DAY_TIME['start_night']
             ))
         result = result + self.add_day_event(sheet_id, 4, 13)
         results = self.service.spreadsheets().batchUpdate(
@@ -245,13 +241,13 @@ class SheetWork:
                      "values": [[self.week_day()[day]]]}
                 ]}).execute()
 
-    def add_event(self):
+    def _add(self, sheet_id):
         pass
 
-    def update_event(self, sheet_id, name):
-        pass
+    def _update(self, sheet_id, name):
+        print(sheet_id, name)
 
-    def delete_event(self):
+    def _delete(self, sheet_id):
         pass
 
     def run(self):
@@ -266,16 +262,17 @@ class SheetWork:
                 if self.function == 'add':
                     print(f'ADD EVENT: https://docs.google.com/spreadsheets/d/{self.spreadsheetId}')
                 elif self.function == 'update':
-                    self.update_event(sheet_id=sheet_list[identy[0]]['properties']['sheetId'],
+                    self._update(sheet_id=sheet_list[identy[0]]['properties']['sheetId'],
                                       name=self.date.strftime('%B'))
                     print(f'UPDATE EVENT: https://docs.google.com/spreadsheets/d/{self.spreadsheetId}')
                 elif self.function == 'delete':
                     print(f'DELETE EVENT: https://docs.google.com/spreadsheets/d/{self.spreadsheetId}')
                 else:
-                    print(f'NID DEBUG BY SheetWork class!')
+                    print(f'NEED DEBUG BY SheetWork class!')
             else:
                 self.event_new_sheet(name=self.date.strftime('%B'))
                 print(f'CREATE SHEET {self.date.strftime("%B")}')
+                self.run()
         else:
             self.spreadsheetId = self.create()['spreadsheetId']
             self.rights(self.spreadsheetId)
@@ -291,4 +288,3 @@ if __name__ == '__main__':
         daily_schedule.run()
     except ValueError as exc:
         exit(f'ERROR by: {exc}')
-
